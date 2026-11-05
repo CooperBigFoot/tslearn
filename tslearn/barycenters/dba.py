@@ -13,6 +13,7 @@ from sklearn.utils import check_random_state
 from tslearn.backend import instantiate_backend
 from tslearn.barycenters.utils import _set_weights
 from tslearn.metrics._dtw import _njit_dtw_path
+from tslearn.metrics._masks import GLOBAL_CONSTRAINT_CODE
 from tslearn.utils import to_time_series_dataset, to_time_series
 from tslearn.utils.utils import _to_time_series
 
@@ -41,8 +42,10 @@ def _petitjean_assignment(
     backend = instantiate_backend("numpy")
     use_parallel = n_jobs not in [None, 1]
 
-    if metric_params is None:
-        metric_params = {}
+    metric_params = {} if metric_params is None else metric_params.copy()
+    metric_params["global_constraint"] = GLOBAL_CONSTRAINT_CODE[
+        metric_params.get("global_constraint")
+    ]
     n = X.shape[0]
     barycenter_size = barycenter.shape[0]
     assign = ([[] for _ in range(barycenter_size)],
@@ -273,8 +276,10 @@ def _mm_assignment(
     backend = instantiate_backend("numpy")
     use_parallel = n_jobs not in [None, 1]
 
-    if metric_params is None:
-        metric_params = {}
+    metric_params = {} if metric_params is None else metric_params.copy()
+    metric_params["global_constraint"] = GLOBAL_CONSTRAINT_CODE[
+        metric_params.get("global_constraint")
+    ]
     n = X.shape[0]
     cost = 0.
     list_p_k = []
