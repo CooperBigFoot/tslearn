@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 import tslearn.barycenters
 from tslearn.utils import to_time_series
@@ -219,3 +220,43 @@ def test_softdtw_barycenter():
     time_series[-1, -2:, :] = np.nan
     sdtw_bar = tslearn.barycenters.softdtw_barycenter(time_series, max_iter=5)
     assert sdtw_bar.shape == (sz, d)
+
+
+@pytest.mark.parametrize("params, expected", [
+    ({"global_constraint": "sakoe_chiba", "sakoe_chiba_radius": 0},
+     [0., .5, .5, 0., 0.]),
+    ({"global_constraint": "itakura", "itakura_max_slope": 1.},
+     [0., .5, .5, 0., 0.]),
+    ({"global_constraint": None}, [0., 0., 1., 0., 0.]),
+    ({}, [0., 0., 1., 0., 0.]),
+])
+@pytest.mark.parametrize("n_jobs", [1, 2])
+@pytest.mark.parametrize("method", [
+    tslearn.barycenters.dtw_barycenter_averaging_petitjean,
+    tslearn.barycenters.dtw_barycenter_averaging,
+])
+def test_dba_explicit_constraint(method, n_jobs, params, expected):
+    series = np.array([[0., 0., 1., 0., 0.], [0., 1., 0., 0., 0.]])
+    original_params = params.copy()
+    barycenter = method(
+        series, init_barycenter=series[0].copy(), metric_params=params,
+        n_jobs=n_jobs,
+    )
+    np.testing.assert_allclose(barycenter[:, 0], expected)
+    assert params == original_params
+
+
+def test_dba_subgradient_explicit_constraint():
+    initial = np.array([0., 0., 1., 0., 0.])
+    target = np.array([0., 1., 0., 0., 0.])
+    params = {"global_constraint": "sakoe_chiba", "sakoe_chiba_radius": 0}
+    barycenter = tslearn.barycenters.dtw_barycenter_averaging_subgradient(
+        [target], init_barycenter=initial.copy(), metric_params=params,
+        max_iter=5, initial_step_size=.1, final_step_size=.1, tol=0.,
+        random_state=0,
+    )
+    # Diagonal alignment gives b_next = b - 2 * .1 * (b - target).
+    expected = target + .8 ** 5 * (initial - target)
+    np.testing.assert_allclose(barycenter[:, 0], expected)
+    assert params == {"global_constraint": "sakoe_chiba",
+                      "sakoe_chiba_radius": 0}
